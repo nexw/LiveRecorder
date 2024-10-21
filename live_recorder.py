@@ -188,6 +188,16 @@ class LiveRecoder:
                 logger.exception(f'{self.flag}直播录制错误：{filename}\n{error}')
         finally:
             output.close()
+            if time.localtime().tm_min == 0:
+                # 关闭当前的录制文件
+                output.close()
+                # 开始一个新的录制文件
+                filename = self.get_filename(title, format)
+                output = FileOutput(Path(f'{self.output}/{filename}'))
+                output.open()
+                recording[url] = (stream_fd, output)
+                logger.info(f'{self.flag}开始新的录制：{filename}')
+
 
     def run_ffmpeg(self, filename, format):
         logger.info(f'{self.flag}开始ffmpeg封装：{filename}')
