@@ -22,6 +22,7 @@ from streamlink.stream import StreamIO, HTTPStream, HLSStream
 from streamlink_cli.main import open_stream
 from streamlink_cli.output import FileOutput
 from streamlink_cli.streamrunner import StreamRunner
+from datetime import datetime
 
 recording: Dict[str, Tuple[StreamIO, FileOutput]] = {}
 
@@ -31,7 +32,7 @@ class LiveRecoder:
         self.id = user['id']
         platform = user['platform']
         name = user.get('name', self.id)
-        self.flag = f'[{platform}][{name}]'
+        self.flag = f'[{name}]'
         
         self.interval = user.get('interval', 10)
         self.crypto_js_url = user.get('crypto_js_url', '')
@@ -88,7 +89,17 @@ class LiveRecoder:
            logger.error(f'网络异常 重试...')
            raise ConnectionError(f'{self.flag}直播检测请求错误\n{repr(error)}')
 		
-           
+    async def autosave(self, stream, url, title, format):
+        while True:
+            now = datetime.datetime.now()
+            next_hour = now.replace(minute=0, second=0, microsecond=0) + datetime.timedelta(hours=1)
+            wait_time = (next_hour - now).total_seconds()
+            logger.info(f'等待{wait_time}秒后自动保存')
+            # Save the recording file at the next hour
+            await asyncio.sleep(wait_time)
+            await self.stream_writer(stream, url, title, format)
+            logger.info(f'Autosaved recording file: {title}')
+
 
     def get_client(self):
         client_kwargs = {
@@ -158,6 +169,7 @@ class LiveRecoder:
             logger.info(f'{self.flag}开始录制：{filename}')
             # 调用streamlink录制直播
             result = self.stream_writer(stream, url, filename)
+            asyncio.create_task(self.autosave(stream, url, title, format))
             # 录制成功、format配置存在且不等于直播平台默认格式时运行ffmpeg封装
             if result and self.format and self.format != format:
                 self.run_ffmpeg(filename, format)
@@ -188,16 +200,6 @@ class LiveRecoder:
                 logger.exception(f'{self.flag}直播录制错误：{filename}\n{error}')
         finally:
             output.close()
-            if time.localtime().tm_min == 0:
-                # 关闭当前的录制文件
-                output.close()
-                # 开始一个新的录制文件
-                filename = self.get_filename(title, format)
-                output = FileOutput(Path(f'{self.output}/{filename}'))
-                output.open()
-                recording[url] = (stream_fd, output)
-                logger.info(f'{self.flag}开始新的录制：{filename}')
-
 
     def run_ffmpeg(self, filename, format):
         logger.info(f'{self.flag}开始ffmpeg封装：{filename}')
@@ -549,6 +551,7 @@ async def run():
         for stream_fd, output in recording.copy().values():
             stream_fd.close()
             output.close()
+        logger.warning('直播流已关闭')
 
 
 if __name__ == '__main__':

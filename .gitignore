@@ -1,2 +1,8 @@
 .venv
 config.json
+logs
+output
+db.sqlite3
+migrations
+*.pyc
+__pycache__
