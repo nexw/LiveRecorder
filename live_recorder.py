@@ -90,6 +90,7 @@ class LiveRecoder:
            raise ConnectionError(f'{self.flag}直播检测请求错误\n{repr(error)}')
 		
     async def autosave(self, stream, url, title, format):
+        
         while True:
             now = datetime.datetime.now()
             next_hour = now.replace(minute=0, second=0, microsecond=0) + datetime.timedelta(hours=1)
@@ -169,7 +170,6 @@ class LiveRecoder:
             logger.info(f'{self.flag}开始录制：{filename}')
             # 调用streamlink录制直播
             result = self.stream_writer(stream, url, filename)
-            asyncio.create_task(self.autosave(stream, url, title, format))
             # 录制成功、format配置存在且不等于直播平台默认格式时运行ffmpeg封装
             if result and self.format and self.format != format:
                 self.run_ffmpeg(filename, format)
